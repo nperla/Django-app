@@ -1,0 +1,97 @@
+trigger: none
+
+pool: AksR&D
+
+variables:
+  KUBECONFIG: $(Build.SourcesDirectory)/config
+  NAMESPACE: default
+  DJANGO_POD_LABEL: app=drf-app
+  GRAFANA_POD_LABEL: app=grafana
+  DB_FILE_PATH: $(Build.ArtifactStagingDirectory)/db.sqlite3
+
+stages:
+- stage: Artifacts
+  jobs:
+  - job: UploadDBFile
+    displayName: 'Upload db.sqlite3 as an Artifact'
+    steps:
+    - script: |
+        echo "Listing files in Build Sources Directory:"
+        ls -l $(Build.SourcesDirectory)
+      displayName: "List Files in Build Sources Directory"
+
+    - script: |
+        mkdir -p $(Build.ArtifactStagingDirectory)
+        cp "$(Build.SourcesDirectory)/db.sqlite3" $(DB_FILE_PATH)
+      displayName: "Copy db.sqlite3 to Staging Directory"
+
+    - script: |
+        echo "Listing files in Staging Directory:"
+        ls -l $(Build.ArtifactStagingDirectory)
+      displayName: "List Files in Staging Directory"
+
+    - task: PublishPipelineArtifact@1
+      displayName: 'Publish db.sqlite3 as Pipeline Artifact'
+      inputs:
+        targetPath: '$(DB_FILE_PATH)'
+        artifact: 'db-file'
+        publishLocation: 'pipeline'
+
+- stage: CopyDB
+  dependsOn: Artifacts
+  jobs:
+  - job: CopyDBToPods
+    steps:
+    - task: DownloadPipelineArtifact@2
+      displayName: 'Download db.sqlite3 Artifact'
+      inputs:
+        artifactName: 'db-file'
+        targetPath: '$(Build.ArtifactStagingDirectory)'
+
+    - script: echo "Artifact downloaded to $(Build.ArtifactStagingDirectory)"
+      displayName: "Debug Artifact Download"
+
+    - task: Kubernetes@1
+      displayName: 'Get Django Pod Name'
+      inputs:
+        kubernetesServiceEndpoint: '<YourK8sServiceConnection>'
+        namespace: $(NAMESPACE)
+        command: 'get'
+        arguments: 'pods -l $(DJANGO_POD_LABEL) -o jsonpath="{.items[0].metadata.name}"'
+      name: GetDjangoPod
+
+    - script: |
+        POD_NAME=$(kubectl get pods -n $(NAMESPACE) -l $(DJANGO_POD_LABEL) -o jsonpath="{.items[0].metadata.name}")
+        echo "##vso[task.setvariable variable=DjangoPodName]$POD_NAME"
+      displayName: "Set Django Pod Name Variable"
+
+    - task: Kubernetes@1
+      displayName: 'Get Grafana Pod Name'
+      inputs:
+        kubernetesServiceEndpoint: '<YourK8sServiceConnection>'
+        namespace: $(NAMESPACE)
+        command: 'get'
+        arguments: 'pods -l $(GRAFANA_POD_LABEL) -o jsonpath="{.items[0].metadata.name}"'
+      name: GetGrafanaPod
+
+    - script: |
+        POD_NAME=$(kubectl get pods -n $(NAMESPACE) -l $(GRAFANA_POD_LABEL) -o jsonpath="{.items[0].metadata.name}")
+        echo "##vso[task.setvariable variable=GrafanaPodName]$POD_NAME"
+      displayName: "Set Grafana Pod Name Variable"
+
+    - task: Kubernetes@1
+      displayName: 'Copy db.sqlite3 to Django Pod'
+      inputs:
+        kubernetesServiceEndpoint: '<YourK8sServiceConnection>'
+        namespace: $(NAMESPACE)
+        command: 'cp'
+        arguments: '$(DB_FILE_PATH) $(DjangoPodName):/app/dbdata/db.sqlite3'
+
+    - task: Kubernetes@1
+      displayName: 'Copy db.sqlite3 to Grafana Pod'
+      inputs:
+        kubernetesServiceEndpoint: '<YourK8sServiceConnection>'
+        namespace: $(NAMESPACE)
+        command: 'cp'
+        arguments: '$(DB_FILE_PATH) $(GrafanaPodName):/var/lib/grafana/db.sqlite3'
+
