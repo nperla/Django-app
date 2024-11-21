@@ -55,11 +55,11 @@ stages:
           - task: AzureCLI@2
             displayName: "Authenticate with AKS Cluster"
             inputs:
-              azureSubscription: "<Azure Service Connection>"
+              azureSubscription: "b9e55f55-b95e-41b5-9320-79fbcf1b1a50"
               scriptType: bash
               scriptLocation: inlineScript
               inlineScript: |
-                az aks get-credentials --resource-group <ResourceGroupName> --name <AKSClusterName> --file $(KUBECONFIG)
+                az aks get-credentials --resource-group dev_djangoaks --name natural-mole-aks --file $(KUBECONFIG)
 
           # Validate Kubernetes cluster connection
           - script: |
