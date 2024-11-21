@@ -1,0 +1,69 @@
+trigger: none
+
+pool: AksR&D
+
+variables:
+  KUBECONFIG: $(Build.SourcesDirectory)/config
+  NAMESPACE: default
+  DJANGO_POD_LABEL: app=drf-app
+  GRAFANA_POD_LABEL: app=grafana
+  DB_FILE_PATH: $(Build.ArtifactStagingDirectory)/db.sqlite3
+
+stages:
+  - stage: Artifacts
+    jobs:
+      - job: UploadDBFile
+        displayName: "Upload db.sqlite3 as an Artifact"
+        steps:
+          - script: |
+              echo "Listing files in Build Sources Directory:"
+              ls -l $(Build.SourcesDirectory)
+            displayName: "List Files in Build Sources Directory"
+
+          - script: |
+              mkdir -p $(Build.ArtifactStagingDirectory)
+              cp "$(Build.SourcesDirectory)/db.sqlite3" $(DB_FILE_PATH)
+            displayName: "Copy db.sqlite3 to Staging Directory"
+
+          - script: |
+              echo "Listing files in Staging Directory:"
+              ls -l $(Build.ArtifactStagingDirectory)
+            displayName: "List Files in Staging Directory"
+
+          - task: PublishPipelineArtifact@1
+            displayName: "Publish db.sqlite3 as Pipeline Artifact"
+            inputs:
+              targetPath: "$(DB_FILE_PATH)"
+              artifact: "db-file"
+              publishLocation: "pipeline"
+
+  - stage: CopyDB
+    dependsOn: Artifacts
+    jobs:
+      - job: CopyDBToPods
+        steps:
+          - task: DownloadPipelineArtifact@2
+            displayName: "Download db.sqlite3 Artifact"
+            inputs:
+              artifactName: "db-file"
+              targetPath: "$(Build.ArtifactStagingDirectory)"
+
+          - script: echo "Artifact downloaded to $(Build.ArtifactStagingDirectory)"
+            displayName: "Debug Artifact Download"
+
+          - script: |
+              DJANGO_POD_NAME=$(kubectl get pods -n $(NAMESPACE) -l $(DJANGO_POD_LABEL) -o jsonpath="{.items[0].metadata.name}")
+              kubectl cp $(DB_FILE_PATH) $(NAMESPACE)/$DJANGO_POD_NAME:/app/dbdata/db.sqlite3
+            displayName: "Copy db.sqlite3 to Django Pod"
+
+          - script: |
+              GRAFANA_POD_NAME=$(kubectl get pods -n $(NAMESPACE) -l $(GRAFANA_POD_LABEL) -o jsonpath="{.items[0].metadata.name}")
+              kubectl cp $(DB_FILE_PATH) $(NAMESPACE)/$GRAFANA_POD_NAME:/var/lib/grafana/db.sqlite3
+            displayName: "Copy db.sqlite3 to Grafana Pod"
+
+          - script: |
+              echo "Resolved Django Pod Name: $DJANGO_POD_NAME"
+              echo "Resolved Grafana Pod Name: $GRAFANA_POD_NAME"
+              echo "Resolved DB File Path: $(DB_FILE_PATH)"
+            displayName: "Debug Variables"
+
