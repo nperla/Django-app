@@ -55,7 +55,7 @@ stages:
           - task: AzureCLI@2
             displayName: "Authenticate with AKS Cluster"
             inputs:
-              azureSubscription: "aks-trial"
+              azureSubscription: "Cluster-auth-access"
               scriptType: bash
               scriptLocation: inlineScript
               inlineScript: |
