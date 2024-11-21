@@ -54,7 +54,7 @@ stages:
     - task: Kubernetes@1
       displayName: 'Get Django Pod Name'
       inputs:
-        kubernetesServiceEndpoint: '<YourK8sServiceConnection>'
+        kubernetesServiceEndpoint: aksdevauth
         namespace: $(NAMESPACE)
         command: 'get'
         arguments: 'pods -l $(DJANGO_POD_LABEL) -o jsonpath="{.items[0].metadata.name}"'
@@ -68,7 +68,7 @@ stages:
     - task: Kubernetes@1
       displayName: 'Get Grafana Pod Name'
       inputs:
-        kubernetesServiceEndpoint: '<YourK8sServiceConnection>'
+        kubernetesServiceEndpoint: aksdevauth
         namespace: $(NAMESPACE)
         command: 'get'
         arguments: 'pods -l $(GRAFANA_POD_LABEL) -o jsonpath="{.items[0].metadata.name}"'
@@ -82,7 +82,7 @@ stages:
     - task: Kubernetes@1
       displayName: 'Copy db.sqlite3 to Django Pod'
       inputs:
-        kubernetesServiceEndpoint: '<YourK8sServiceConnection>'
+        kubernetesServiceEndpoint: aksdevauth
         namespace: $(NAMESPACE)
         command: 'cp'
         arguments: '$(DB_FILE_PATH) $(DjangoPodName):/app/dbdata/db.sqlite3'
@@ -90,7 +90,7 @@ stages:
     - task: Kubernetes@1
       displayName: 'Copy db.sqlite3 to Grafana Pod'
       inputs:
-        kubernetesServiceEndpoint: '<YourK8sServiceConnection>'
+        kubernetesServiceEndpoint: aksdevauth
         namespace: $(NAMESPACE)
         command: 'cp'
         arguments: '$(DB_FILE_PATH) $(GrafanaPodName):/var/lib/grafana/db.sqlite3'
