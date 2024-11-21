@@ -1,0 +1,42 @@
+apiVersion: v1
+kind: Service
+metadata:
+   name: drf-app
+spec:
+   type: LoadBalancer
+   ports:
+   - protocol: TCP
+     port: 80
+     targetPort: 8000
+   selector:
+      app: drf-app
+      type: api
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: drf-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: drf-app
+      type: api
+  template:
+    metadata:
+      labels:
+        app: drf-app
+        type: api
+    spec:
+      containers:
+      - name: drf-app
+        image: akstestacr2024.azurecr.io/dev/test:drf-app_0.0.4
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8000
+          #envFrom:
+          #- secretRef:
+          #   name: drf-app-secret
+        env:
+        - name: DEBUG
+          value: "False"
